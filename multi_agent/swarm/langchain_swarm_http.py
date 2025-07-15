@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 app = FastAPI()
 
-# 全局变量存储各种组件
+# Global variables store various components.
 model = None
 tools = {}
 agents = {}
@@ -130,7 +130,7 @@ async def initialize_components():
         name="transfer_agent",
     )
 
-    # 创建工作流
+    # Create workflow
     workflow = create_swarm(
         [dispatch_agent, analysis_agent, bridge_agent, swap_agent, transfer_agent],
         default_active_agent=dispatch_agent.name
