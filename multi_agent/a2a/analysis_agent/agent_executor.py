@@ -4,20 +4,20 @@ from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from a2a.server.tasks import TaskUpdater
 from a2a.types import InvalidParamsError, Part, TextPart, InternalError, UnsupportedOperationError, TaskState
-from a2a.utils import new_agent_text_message
+from a2a.utils import new_agent_text_message, new_task
 from a2a.utils.errors import ServerError
 
-from multi_agent.a2a.dispatch_agent.agent import DispatchAgent
+from multi_agent.a2a.analysis_agent.agent import AnalysisAgent
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class DispatchAgentExecutor(AgentExecutor):
+class AnalysisAgentExecutor(AgentExecutor):
     """Currency Conversion AgentExecutor Example."""
 
-    def __init__(self):
-        self.agent = DispatchAgent()
+    def __init__(self, tools):
+        self.agent = AnalysisAgent(tools)
 
     async def execute(
         self,

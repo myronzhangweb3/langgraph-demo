@@ -1,7 +1,7 @@
+import asyncio
 import logging
 import sys
 
-import click
 import httpx
 import uvicorn
 from a2a.server.apps import A2AStarletteApplication
@@ -9,9 +9,10 @@ from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore, InMemoryPushNotifier
 from a2a.types import AgentCapabilities, AgentSkill, AgentCard
 from dotenv import load_dotenv
+from langchain_mcp_adapters.client import MultiServerMCPClient
 
-from multi_agent.a2a.dispatch_agent.agent import DispatchAgent
-from multi_agent.a2a.dispatch_agent.agent_executor import DispatchAgentExecutor
+from multi_agent.a2a.analysis_agent.agent import AnalysisAgent
+from multi_agent.a2a.analysis_agent.agent_executor import AnalysisAgentExecutor
 
 load_dotenv()
 
@@ -23,35 +24,40 @@ class MissingAPIKeyError(Exception):
     """Exception for missing API key."""
 
 
-@click.command()
-@click.option('--host', 'host', default='localhost')
-@click.option('--port', 'port', default=10000)
-def main(host, port):
+async def main(host, port):
     """Starts the Currency Agent server."""
     try:
         capabilities = AgentCapabilities(streaming=True, pushNotifications=True)
         skill = AgentSkill(
-            id='dispatch_agent',
-            name='Dispatch Agent',
-            description='Helps with dispatch task to other agents',
-            tags=['dispatch agent'],
-            examples=['Please help me transfer 10 USDT to my friends'],
+            id='analysis_agent',
+            name='Analysis Agent',
+            description='Helps with analysis user assets and chain information',
+            tags=['analysis agent'],
+            examples=['Check my assets', 'query ethereum height'],
         )
         agent_card = AgentCard(
-            name='Dispatch Agent',
-            description='Helps with dispatch task to other agents',
+            name='Analysis Agent',
+            description='Helps with analysis user assets and chain information',
             url=f'http://{host}:{port}/',
             version='1.0.0',
-            defaultInputModes=DispatchAgent.SUPPORTED_CONTENT_TYPES,
-            defaultOutputModes=DispatchAgent.SUPPORTED_CONTENT_TYPES,
+            defaultInputModes=AnalysisAgent.SUPPORTED_CONTENT_TYPES,
+            defaultOutputModes=AnalysisAgent.SUPPORTED_CONTENT_TYPES,
             capabilities=capabilities,
             skills=[skill],
         )
 
         # --8<-- [start:DefaultRequestHandler]
         httpx_client = httpx.AsyncClient()
+        tools = await MultiServerMCPClient(
+            {
+                "analysis": {
+                    "url": "http://36.189.252.2:18133/mcp/analysis",
+                    "transport": "streamable_http",
+                }
+            }
+        ).get_tools()
         request_handler = DefaultRequestHandler(
-            agent_executor=DispatchAgentExecutor(),
+            agent_executor=AnalysisAgentExecutor(tools),
             task_store=InMemoryTaskStore(),
             push_notifier=InMemoryPushNotifier(httpx_client),
         )
@@ -70,5 +76,5 @@ def main(host, port):
         sys.exit(1)
 
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    asyncio.run(main('localhost', 10000))

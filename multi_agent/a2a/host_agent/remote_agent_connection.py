@@ -15,7 +15,7 @@ from a2a.types import (
     TaskArtifactUpdateEvent,
     TaskStatusUpdateEvent,
 )
-
+from a2a.utils import new_agent_text_message
 
 TaskCallbackArg = Task | TaskStatusUpdateEvent | TaskArtifactUpdateEvent
 TaskUpdateCallback = Callable[[TaskCallbackArg, AgentCard], Task]
@@ -48,6 +48,8 @@ class RemoteAgentConnections:
                 event = response.root.result
                 if isinstance(event, Message):
                     return event
+                if isinstance(event, TaskArtifactUpdateEvent):
+                    return new_agent_text_message(text=event.artifact.parts[0].root.text, context_id=event.contextId, task_id=event.taskId)
 
                 # Otherwise we are in the Task + TaskUpdate cycle.
                 if task_callback and event:

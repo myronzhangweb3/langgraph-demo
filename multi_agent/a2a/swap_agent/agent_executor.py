@@ -7,7 +7,7 @@ from a2a.types import InvalidParamsError, Part, TextPart, InternalError, Unsuppo
 from a2a.utils import new_agent_text_message
 from a2a.utils.errors import ServerError
 
-from multi_agent.a2a.dispatch_agent.agent import DispatchAgent
+from multi_agent.a2a.analysis_agent.agent import AnalysisAgent
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ class SwapAgentExecutor(AgentExecutor):
     """Currency Conversion AgentExecutor Example."""
 
     def __init__(self):
-        self.agent = DispatchAgent()
+        self.agent = AnalysisAgent()
 
     async def execute(
         self,

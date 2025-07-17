@@ -20,6 +20,7 @@ from a2a.types import (
 from google.adk import Agent
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.agents.readonly_context import ReadonlyContext
+from google.adk.models.lite_llm import LiteLlm
 from google.adk.tools.tool_context import ToolContext
 from google.genai import types
 
@@ -75,7 +76,12 @@ class HostAgent:
 
     def create_agent(self) -> Agent:
         return Agent(
-            model='gemini-2.0-flash-001',
+            model=LiteLlm(
+                model="openai/gpt-4o-2024-11-20",
+                api_base="https://openrouter.ai/api/v1",
+                # Alternatively, if endpoint uses an API key:
+                # api_key="YOUR_ENDPOINT_API_KEY"
+            ),
             name='host_agent',
             instruction=self.root_instruction,
             before_model_callback=self.before_model_callback,
@@ -185,7 +191,7 @@ Current agent: {current_agent['active_agent']}
         )
         response = await client.send_message(request, self.task_callback)
         if isinstance(response, Message):
-            return await convert_parts(task.parts, tool_context)
+            return await convert_parts(response.parts, tool_context)
         task: Task = response
         # Assume completion unless a state returns that isn't complete
         state['session_active'] = task.status.state not in [

@@ -1,5 +1,9 @@
 ## Hosts
 
+This demo application showcases agents talking to other agents over A2A.
+
+![image](a2a_demo_arch.png)
+
 Sample apps or agents that are A2A clients that work with A2A servers. 
 
 * [CLI](/samples/python/hosts/cli)  
