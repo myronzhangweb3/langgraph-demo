@@ -11,8 +11,8 @@ from a2a.types import AgentCapabilities, AgentSkill, AgentCard
 from dotenv import load_dotenv
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
-from multi_agent.a2a.swap_agent.agent import SwapAgent
-from multi_agent.a2a.swap_agent.agent_executor import SwapAgentExecutor
+from multi_agent.a2a.transfer_agent.agent import TransferAgent
+from multi_agent.a2a.transfer_agent.agent_executor import TransferAgentExecutor
 
 load_dotenv()
 
@@ -29,19 +29,19 @@ async def main(host, port):
     try:
         capabilities = AgentCapabilities(streaming=True, pushNotifications=True)
         skill = AgentSkill(
-            id='swap_agent',
-            name='Swap Agent',
-            description='Helps with swap token',
-            tags=['swap agent'],
-            examples=['swap 1 USDT to ETH'],
+            id='bridge_agent',
+            name='Bridge Agent',
+            description='Helps with bridge token',
+            tags=['bridge agent'],
+            examples=['Bridge USDT from ethereum to arbitrum'],
         )
         agent_card = AgentCard(
-            name='Swap Agent',
-            description='Helps with swap token',
+            name='Bridge Agent',
+            description='Helps with bridge token',
             url=f'http://{host}:{port}/',
             version='1.0.0',
-            defaultInputModes=SwapAgent.SUPPORTED_CONTENT_TYPES,
-            defaultOutputModes=SwapAgent.SUPPORTED_CONTENT_TYPES,
+            defaultInputModes=TransferAgent.SUPPORTED_CONTENT_TYPES,
+            defaultOutputModes=TransferAgent.SUPPORTED_CONTENT_TYPES,
             capabilities=capabilities,
             skills=[skill],
         )
@@ -50,14 +50,14 @@ async def main(host, port):
         tools = await MultiServerMCPClient(
             {
                 "analysis": {
-                    "url": "http://36.189.252.2:18133/mcp/swap",
+                    "url": "http://36.189.252.2:18133/mcp/bridge",
                     "transport": "streamable_http",
                 }
             }
         ).get_tools()
         httpx_client = httpx.AsyncClient()
         request_handler = DefaultRequestHandler(
-            agent_executor=SwapAgentExecutor(tools),
+            agent_executor=TransferAgentExecutor(tools),
             task_store=InMemoryTaskStore(),
             push_notifier=InMemoryPushNotifier(httpx_client),
         )
@@ -77,4 +77,4 @@ async def main(host, port):
 
 
 if __name__ == '__main__':
-    asyncio.run(main('localhost', 10002))
+    asyncio.run(main('localhost', 10001))

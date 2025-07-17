@@ -2,7 +2,6 @@ from collections.abc import AsyncIterable
 from typing import Any, Literal
 
 from langchain_core.messages import AIMessage, ToolMessage
-from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent

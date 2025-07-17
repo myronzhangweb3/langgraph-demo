@@ -7,7 +7,7 @@ from a2a.types import InvalidParamsError, Part, TextPart, InternalError, Unsuppo
 from a2a.utils import new_agent_text_message, new_task
 from a2a.utils.errors import ServerError
 
-from multi_agent.a2a.transfer_agent.agent import TransferAgent
+from multi_agent.a2a.bridge_agent.agent import BridgeAgent
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ class TransferAgentExecutor(AgentExecutor):
     """Currency Conversion AgentExecutor Example."""
 
     def __init__(self, tools):
-        self.agent = TransferAgent(tools)
+        self.agent = BridgeAgent(tools)
 
     async def execute(
         self,

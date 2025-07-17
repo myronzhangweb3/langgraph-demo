@@ -9,7 +9,6 @@ from google.adk.agents import LlmAgent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
-from pydantic import BaseModel, Field
 
 APP_NAME = "TESTAPP"
 USER_ID = "test_user_456"
@@ -55,9 +54,10 @@ async def call_agent_and_print(
 
 async def main():
     root_agent = HostAgent(remote_agent_addresses=[
-        'http://localhost:10000',
-        # 'http://localhost:10001',
-        # 'http://localhost:10002'
+        'http://localhost:10000', # analysis_agent
+        'http://localhost:10001', # bridge_agent
+        'http://localhost:10002', # swap_agent
+        'http://localhost:10003', # transfer_agent
     ],
         http_client=httpx.AsyncClient(timeout=30)).create_agent()
 
@@ -69,29 +69,18 @@ async def main():
 
     await session_service.create_session(app_name=APP_NAME, user_id=USER_ID, session_id=SESSION_ID_TOOL_AGENT)
 
-    await call_agent_and_print(capital_runner, root_agent, session_id=SESSION_ID_TOOL_AGENT, query_json='查询当前 ethereum 高度')
-    # await call_agent_and_print(capital_runner, root_agent, session_id=SESSION_ID_TOOL_AGENT, query_json='{"country": "France"}')
-    # async for turn in root_agent.astream(
-    #         input={"messages": [
-    #             # case 1
-    #             {"role": "user", "content": "查询当前 ethereum 高度"}]},
-    #
-    #             # case 2
-    #             # {"role": "user", "content": "查询0xF5054F94009B7E9999F6459f40d8EaB1A2ceA22D有哪些资产？"}]},
-    #
-    #             # case 3
-    #             # {"role": "user",
-    #             #  "content": "我的地址是0xF5054F94009B7E9999F6459f40d8EaB1A2ceA22D，我想在 Ethereum 网络上给 0xD64229dF1EB0354583F46e46580849B1572BB56d 转 0.1 USDT"}]},
-    #         stream_mode="debug",
-    # ):
-    #     print(turn)
-    #     print(f"step: {turn.get('step')}")
-    #     print(f"type: {turn.get('type')}")
-    #     if turn.get('payload').__contains__('values'):
-    #         for msg in turn['payload']['values']['messages']:
-    #             print(f"{type(msg).__name__}: {msg.content if msg.content != '' else msg.additional_kwargs}")
+    # await call_agent_and_print(capital_runner, root_agent, session_id=SESSION_ID_TOOL_AGENT, query_json='Query the current Ethereum height.')
+    await call_agent_and_print(capital_runner, root_agent, session_id=SESSION_ID_TOOL_AGENT, query_json='What assets does 0xF5054F94009B7E9999F6459f40d8EaB1A2ceA22D have on all chains?')
+    # await call_agent_and_print(capital_runner, root_agent, session_id=SESSION_ID_TOOL_AGENT, query_json='My wallet address is 0xF5054F94009B7E9999F6459f40d8EaB1A2ceA22D，I want to send 0xD64229dF1EB0354583F46e46580849B1572BB56d 0.1 USDT on Ethereum"')
 
-
+    # while True:
+    #     user_input = input("Human('exit' to exit):")
+    #     if user_input.lower() == 'exit':
+    #         print("The program has exited.")
+    #         break
+    #     else:
+    #         await call_agent_and_print(capital_runner, root_agent, session_id=SESSION_ID_TOOL_AGENT,
+    #                                    query_json=user_input)
 
 
 asyncio.run(main())

@@ -71,14 +71,14 @@ async def main():
     analysis_agent = create_react_agent(
         model,
         tools=tools["analysis_tools"] + list({k: v for k, v in agents.items() if k != "analysis_agent"}.values()),
-        prompt="You are asset analysis Agent. 你可以查询用户资产，链信息，交易信息",
+        prompt="You are asset analysis Agent. You can query user assets, chain information, and transaction information.",
         name="analysis_agent",
     )
 
     bridge_agent = create_react_agent(
         model,
         tools=tools["bridge_tools"] + list({k: v for k, v in agents.items() if k != "bridge_agent"}.values()),
-        prompt="You are bridge agent. 你可以将用户的token 从一条链桥到另外一条链",
+        prompt="You are bridge agent. You can bridge the user's token from one chain to another.",
         name="bridge_agent",
     )
 
@@ -92,7 +92,7 @@ async def main():
     transfer_agent = create_react_agent(
         model,
         tools=tools["transfer_tools"] + list({k: v for k, v in agents.items() if k != "transfer_agent"}.values()),
-        prompt="You are transfer agent. 发送交易之前需要先检查用户的余额是否足够,如果不够可以考虑swap，bridge等值token，注意swap或bridge需要保留一部分gasfee",
+        prompt="You are transfer agent. Before sending a transaction, it is necessary to check if the user's balance is sufficient. If not, consider swapping or bridging equivalent tokens. Note that swapping or bridging requires reserving a portion of the gas fee.",
         name="transfer_agent",
     )
 
@@ -108,14 +108,14 @@ async def main():
     async for turn in agent.astream(
             input={"messages": [
                 # case 1
-                # {"role": "user", "content": "当前 ethereum 高度"}]},
+                # {"role": "user", "content": "Current Ethereum height"}]},
 
                 # case 2
-                # {"role": "user", "content": "查询0xF5054F94009B7E9999F6459f40d8EaB1A2ceA22D有哪些资产？"}]},
+                {"role": "user", "content": "What assets does 0xF5054F94009B7E9999F6459f40d8EaB1A2ceA22D have?"}]},
 
                 # case 3
-                {"role": "user",
-                 "content": "我的地址是0xF5054F94009B7E9999F6459f40d8EaB1A2ceA22D，我想在 Ethereum 网络上给 0xD64229dF1EB0354583F46e46580849B1572BB56d 转 0.1 USDT"}]},
+                # {"role": "user",
+                #  "content": "My wallet address is 0xF5054F94009B7E9999F6459f40d8EaB1A2ceA22D，I want to send 0xD64229dF1EB0354583F46e46580849B1572BB56d 0.1 USDT on Ethereum"}]},
 
             config=config,
             stream_mode="debug",

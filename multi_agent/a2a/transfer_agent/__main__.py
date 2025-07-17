@@ -1,7 +1,7 @@
+import asyncio
 import logging
 import sys
 
-import click
 import httpx
 import uvicorn
 from a2a.server.apps import A2AStarletteApplication
@@ -9,6 +9,7 @@ from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore, InMemoryPushNotifier
 from a2a.types import AgentCapabilities, AgentSkill, AgentCard
 from dotenv import load_dotenv
+from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from multi_agent.a2a.transfer_agent.agent import TransferAgent
 from multi_agent.a2a.transfer_agent.agent_executor import TransferAgentExecutor
@@ -23,10 +24,7 @@ class MissingAPIKeyError(Exception):
     """Exception for missing API key."""
 
 
-@click.command()
-@click.option('--host', 'host', default='localhost')
-@click.option('--port', 'port', default=10001)
-def main(host, port):
+async def main(host, port):
     """Starts the Currency Agent server."""
     try:
         capabilities = AgentCapabilities(streaming=True, pushNotifications=True)
@@ -49,9 +47,17 @@ def main(host, port):
         )
 
         # --8<-- [start:DefaultRequestHandler]
+        tools = await MultiServerMCPClient(
+            {
+                "analysis": {
+                    "url": "http://36.189.252.2:18133/mcp/transfer",
+                    "transport": "streamable_http",
+                }
+            }
+        ).get_tools()
         httpx_client = httpx.AsyncClient()
         request_handler = DefaultRequestHandler(
-            agent_executor=TransferAgentExecutor(),
+            agent_executor=TransferAgentExecutor(tools),
             task_store=InMemoryTaskStore(),
             push_notifier=InMemoryPushNotifier(httpx_client),
         )
@@ -71,4 +77,4 @@ def main(host, port):
 
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main('localhost', 10003))
