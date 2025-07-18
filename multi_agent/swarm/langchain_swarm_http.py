@@ -1,18 +1,50 @@
-import asyncio
+import json
+import uuid
+from typing import List, Dict, Any, Optional
 
+import uvicorn
+from fastapi import FastAPI, Request
+from fastapi.responses import StreamingResponse
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.prebuilt import create_react_agent
 from langgraph_swarm import create_handoff_tool, create_swarm
+from pydantic import BaseModel
 
-model = ChatOpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    openai_proxy="http://127.0.0.1:7890",
-    model="openai/gpt-4o-2024-11-20")
+app = FastAPI()
+
+# Global variables store various components.
+model = None
+tools = {}
+agents = {}
+workflow = None
+checkpointers = {}
 
 
-async def main():
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class ChatRequest(BaseModel):
+    messages: List[ChatMessage]
+    thread_id: Optional[str] = None
+
+
+async def initialize_components():
+    global model, tools, agents, workflow
+
+    if model is not None:
+        return
+
+    model = ChatOpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        openai_proxy="http://127.0.0.1:7890",
+        model="openai/gpt-4o-2024-11-20"
+    )
+
+    # Initialize tool
     tools = {
         "bridge_tools": await MultiServerMCPClient(
             {
@@ -48,6 +80,7 @@ async def main():
         ).get_tools(),
     }
 
+    # Initialize proxy tools
     agents = {
         "dispatch_agent": create_handoff_tool(agent_name="dispatch_agent",
                                               description="Transfer to dispatch agent, she can help with dispatch"),
@@ -61,6 +94,7 @@ async def main():
                                               description="Transfer to analysis agent, she can help with analysis chain info and token info"),
     }
 
+    # Create each agent
     dispatch_agent = create_react_agent(
         model,
         tools=list({k: v for k, v in agents.items() if k != "dispatch_agent"}.values()),
@@ -71,14 +105,14 @@ async def main():
     analysis_agent = create_react_agent(
         model,
         tools=tools["analysis_tools"] + list({k: v for k, v in agents.items() if k != "analysis_agent"}.values()),
-        prompt="You are asset analysis Agent. 你可以查询用户资产，链信息，交易信息",
+        prompt="You are asset analysis Agent. You can query user assets, chain information, and transaction information.",
         name="analysis_agent",
     )
 
     bridge_agent = create_react_agent(
         model,
         tools=tools["bridge_tools"] + list({k: v for k, v in agents.items() if k != "bridge_agent"}.values()),
-        prompt="You are bridge agent. 你可以将用户的token 从一条链桥到另外一条链",
+        prompt="You are bridge agent. You can transfer the user's token from one chain to another.",
         name="bridge_agent",
     )
 
@@ -92,45 +126,82 @@ async def main():
     transfer_agent = create_react_agent(
         model,
         tools=tools["transfer_tools"] + list({k: v for k, v in agents.items() if k != "transfer_agent"}.values()),
-        prompt="You are transfer agent. 发送交易之前需要先检查用户的余额是否足够,如果不够可以考虑swap，bridge等值token，注意swap或bridge需要保留一部分gasfee",
+        prompt="You are transfer agent. Before sending a transaction, it is necessary to check if the user's balance is sufficient. If not, consider swapping or bridging equivalent tokens. Note that when swapping or bridging, a portion of the gas fee needs to be reserved.",
         name="transfer_agent",
     )
 
-    checkpointer = InMemorySaver()
+    # Create workflow
     workflow = create_swarm(
         [dispatch_agent, analysis_agent, bridge_agent, swap_agent, transfer_agent],
         default_active_agent=dispatch_agent.name
     )
-    agent = workflow.compile(checkpointer=checkpointer)
-
-    config = {"configurable": {"thread_id": "1"}}
-
-    async for turn in agent.astream(
-            input={"messages": [
-                # case 1
-                # {"role": "user", "content": "当前 ethereum 高度"}]},
-
-                # case 2
-                # {"role": "user", "content": "查询0xF5054F94009B7E9999F6459f40d8EaB1A2ceA22D有哪些资产？"}]},
-
-                # case 3
-                {"role": "user",
-                 "content": "我的地址是0xF5054F94009B7E9999F6459f40d8EaB1A2ceA22D，我想在 Ethereum 网络上给 0xD64229dF1EB0354583F46e46580849B1572BB56d 转 0.1 USDT"}]},
-
-            config=config,
-            stream_mode="debug",
-    ):
-        print(turn)
-        print(f"step: {turn.get('step')}")
-        print(f"type: {turn.get('type')}")
-        if turn.get('payload').__contains__('values'):
-            for msg in turn['payload']['values']['messages']:
-                print(f"{type(msg).__name__}: {msg.content if msg.content != '' else msg.additional_kwargs}")
 
 
-# asyncio.run(main())
+@app.on_event("startup")
+async def startup_event():
+    await initialize_components()
 
-try:
-    asyncio.run(main())
-except Exception as e:
-    pass  # 忽略特定异常
+
+async def process_chat_stream(request_data: Dict[str, Any], thread_id: str):
+    """Process chat streams and generate responses"""
+    global workflow, checkpointers
+
+    await initialize_components()
+
+    if thread_id not in checkpointers:
+        checkpointers[thread_id] = InMemorySaver()
+
+    agent = workflow.compile(checkpointer=checkpointers[thread_id])
+
+    config = {"configurable": {"thread_id": thread_id}}
+
+    input_data = {"messages": request_data["messages"]}
+
+    try:
+        msg_idx = 0
+        async for turn in agent.astream(
+                input=input_data,
+                config=config,
+                stream_mode="values",
+        ):
+            while len(turn['messages']) > msg_idx:
+                if turn['messages'][msg_idx].type in ('ai', 'tool'):
+                    messages = turn['messages'][msg_idx]
+                    content = messages.content if messages.content else messages.additional_kwargs
+                    yield f"data: {json.dumps({'content': content, 'role': 'assistant'})}\n\n"
+                msg_idx += 1
+    except Exception as e:
+        yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    yield "data: [DONE]\n\n"
+
+
+@app.post("/chat")
+async def openai_compatible_chat(request: Request):
+    data = await request.json()
+
+    messages = data.get("messages", [])
+    thread_id = data.get("thread_id") or str(uuid.uuid4())
+
+    request_data = {"messages": messages}
+
+    return StreamingResponse(
+        process_chat_stream(request_data, thread_id),
+        media_type="text/event-stream"
+    )
+
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+
+def start_server():
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+if __name__ == "__main__":
+    try:
+        start_server()
+    except Exception as e:
+        print(f"Server error: {e}")
