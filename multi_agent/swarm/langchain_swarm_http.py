@@ -176,7 +176,7 @@ async def process_chat_stream(request_data: Dict[str, Any], thread_id: str):
     yield "data: [DONE]\n\n"
 
 
-@app.post("/chat/completions")
+@app.post("/chat")
 async def openai_compatible_chat(request: Request):
     data = await request.json()
 
